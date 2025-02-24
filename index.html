@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Travel Advice</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 50px;
+        }
+        .container {
+            max-width: 600px;
+        }
+        .spinner-border {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mt-5">Travel Advice</h1>
+        <p>Search for travel information and get results with a relevance score.</p>
+        <div class="form-group">
+            <label for="inputPlace">Enter the place you want to search for travel information:</label>
+            <input type="text" class="form-control" id="inputPlace" placeholder="Enter place">
+        </div>
+        <button class="btn btn-primary" onclick="searchTravelInfo()">Search</button>
+        <div class="mt-4" id="results"></div>
+        <div class="spinner-border text-primary" role="status" id="loadingSpinner">
+            <span class="sr-only">Loading...</span>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        const TAVILY_API_KEY = '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';
+        const GROQ_API_KEY = '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';
+
+        async function searchTravelInfo() {
+            const inputPlace = document.getElementById('inputPlace').value;
+            if (!inputPlace) {
+                alert('Please enter a place.');
+                return;
+            }
+
+            document.getElementById('loadingSpinner').style.display = 'block';
+            const tavilySearchResults = await searchTavily(inputPlace);
+            document.getElementById('loadingSpinner').style.display = 'none';
+            displayResults(tavilySearchResults.results.slice(0, 10));
+        }
+
+        async function searchTavily(query) {
+            const response = await fetch('https://api.tavily.com/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${TAVILY_API_KEY}`
+                },
+                body: JSON.stringify({ query })
+            });
+
+            const data = await response.json();
+            return data;
+        }
+
+        function displayResults(results) {
+            let table = `<table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>URL</th>
+                                    <th>Content</th>
+                                    <th>Score</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+            results.forEach(result => {
+                table += `<tr>
+                            <td>${result.title}</td>
+                            <td><a href="${result.url}" target="_blank">${result.url}</a></td>
+                            <td>${result.content}</td>
+                            <td>${result.score}</td>
+                          </tr>`;
+            });
+            table += `</tbody></table>`;
+            document.getElementById('results').innerHTML = table;
+        }
+
+        async function getGroqCompletion(prompt) {
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${GROQ_API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: "groq/llama-3.3-70b-versatile",
+                    prompt: prompt,
+                    temperature: 1,
+                    max_tokens: 1024
+                })
+            });
+
+            const data = await response.json();
+            return data.choices[0].text;
+        }
+
+        const tavily_tool = {
+            name: "Tavily Search",
+            func: searchTavily,
+            description: "Search for real-time travel information using Tavily."
+        };
+
+        const tavily_agent = {
+            role: "Travel Assistant",
+            goal: "Provide travelers with up-to-date travel information, including destinations, flight details, and attractions.",
+            backstory: "You are an expert travel assistant who helps users find the best travel destinations, flights, and activities based on real-time data.",
+            verbose: true,
+            tools: [tavily_tool],
+            llm: {
+                model: "groq/llama-3.3-70b-versatile",
+                base_url: "https://api.groq.com/openai/v1/chat/completions",
+                api_key: GROQ_API_KEY,
+                temperature: 1,
+                max_tokens: 1024
+            }
+        };
+    </script>
+</body>
+</html>
